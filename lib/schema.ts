@@ -1,6 +1,10 @@
 import { z } from 'zod'
 import { offerings } from '@/content/offerings'
 
+// The site's CSP forbids eval. Without this, zod probes `new Function` once to decide on its
+// JIT path; the probe is caught, but Firefox reports it as a CSP violation in the console.
+z.config({ jitless: true })
+
 const interestIds = offerings.map((o) => o.id) as [string, ...string[]]
 
 export const inquirySchema = z.object({
