@@ -41,9 +41,27 @@ export const viewport: Viewport = {
   themeColor: '#006199',
 }
 
-// Runs before first paint: flags JS (with a 4 s fallback if hydration never happens) and opts
-// into the opening intro once per session when motion is allowed.
-const boot = `(function(){var d=document.documentElement;d.classList.add('js');setTimeout(function(){if(!window.__wcHydrated)d.classList.remove('js')},4000);try{if(!sessionStorage.getItem('wc-intro')&&matchMedia('(prefers-reduced-motion: no-preference)').matches){d.classList.add('intro');sessionStorage.setItem('wc-intro','1');setTimeout(function(){d.classList.remove('intro')},3800)}}catch(e){}})()`
+// Runs before first paint: flags JS (with a 4 s fallback if hydration never happens) and, once
+// per session when motion is allowed, runs the opening intro. Progress follows real readiness —
+// DOM parsed, fonts loaded, hero photo decoded — and the line and counter ease toward it each
+// frame. The curtain lifts once they show 100 and the logo has finished drawing (≥ 1.75 s);
+// a 3.6 s cap means a slow network never holds the page back.
+const boot = `(function(){
+var d=document.documentElement;d.classList.add('js');
+setTimeout(function(){if(!window.__wcHydrated)d.classList.remove('js')},4000);
+try{if(sessionStorage.getItem('wc-intro')||!matchMedia('(prefers-reduced-motion: no-preference)').matches)return;sessionStorage.setItem('wc-intro','1')}catch(e){return}
+d.classList.add('intro');
+var t0=performance.now(),MIN=1750,target=0.06,shown=0,loaded=false,left=false;
+function set(v){if(v>target)target=v}
+function exit(){if(left)return;left=true;d.classList.add('intro-done');setTimeout(function(){d.classList.remove('intro','intro-done');d.style.removeProperty('--intro-p')},1000)}
+function tick(now){if(left)return;if(!loaded)set(Math.min(0.9,target+(0.9-target)*0.015));shown+=Math.max(0.006,(target-shown)*0.09);if(shown>target)shown=target;d.style.setProperty('--intro-p',shown.toFixed(3));var c=document.getElementById('intro-count');if(c)c.textContent=('00'+Math.round(shown*100)).slice(-3);if(loaded&&shown>=0.999&&now-t0>=MIN){setTimeout(exit,180);return}requestAnimationFrame(tick)}
+requestAnimationFrame(tick);
+function finish(){loaded=true;set(1)}
+function hero(){var i=document.querySelector('img[fetchpriority="high"]');if(!i||i.complete)return Promise.resolve();return new Promise(function(r){i.addEventListener('load',r,{once:true});i.addEventListener('error',r,{once:true})})}
+function ready(){set(0.4);var f=document.fonts&&document.fonts.ready?document.fonts.ready:Promise.resolve();Promise.all([f.then(function(){set(0.65)}),hero().then(function(){set(0.85)})]).then(finish,finish)}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready,{once:true});else ready();
+setTimeout(finish,2800);setTimeout(exit,3600);
+})()`
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (

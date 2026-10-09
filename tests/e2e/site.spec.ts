@@ -183,6 +183,19 @@ test.describe('opening intro', () => {
     expect(state.bodyHeight).toBeGreaterThan(0)
     await expect(page.locator('.site-intro')).toBeVisible()
   })
+
+  test('the loader reaches 100 and the curtain lifts by itself', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' })
+    await expect(page.locator('#intro-count')).toHaveText('100', { timeout: 5000 })
+    await expect(page.locator('html')).not.toHaveClass(/(^|\s)intro(\s|$)/, { timeout: 6000 })
+    await expect(page.locator('.site-intro')).toBeHidden()
+  })
+
+  test('a second visit in the same session skips the intro', async ({ page }) => {
+    await page.goto('/')
+    await page.goto('/about')
+    await expect(page.locator('html')).not.toHaveClass(/(^|\s)intro(\s|$)/)
+  })
 })
 
 test.describe('responsive sweep', () => {
