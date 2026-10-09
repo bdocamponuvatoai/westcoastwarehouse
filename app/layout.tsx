@@ -42,19 +42,20 @@ export const viewport: Viewport = {
 }
 
 // Runs before first paint: flags JS (with a 4 s fallback if hydration never happens) and, once
-// per session when motion is allowed, runs the opening intro. Progress follows real readiness —
-// DOM parsed, fonts loaded, hero photo decoded — and the line and counter ease toward it each
-// frame. The curtain lifts once they show 100 and the logo has finished drawing (≥ 1.75 s);
-// a 3.6 s cap means a slow network never holds the page back.
+// per session when motion is allowed, runs the opening intro. Progress follows real readiness:
+// DOM parsed, fonts loaded, hero photo decoded. The line and counter ease toward it by elapsed
+// time, so a throttled frame rate cannot stall them. The curtain lifts at 100 once the logo has
+// finished drawing (at least 1.75 s); a 3.6 s cap always lifts it, showing 100, on slow networks.
 const boot = `(function(){
 var d=document.documentElement;d.classList.add('js');
 setTimeout(function(){if(!window.__wcHydrated)d.classList.remove('js')},4000);
 try{if(sessionStorage.getItem('wc-intro')||!matchMedia('(prefers-reduced-motion: no-preference)').matches)return;sessionStorage.setItem('wc-intro','1')}catch(e){return}
 d.classList.add('intro');
-var t0=performance.now(),MIN=1750,target=0.06,shown=0,loaded=false,left=false;
+var t0=performance.now(),last=t0,MIN=1750,target=0.06,shown=0,loaded=false,left=false;
 function set(v){if(v>target)target=v}
-function exit(){if(left)return;left=true;d.classList.add('intro-done');setTimeout(function(){d.classList.remove('intro','intro-done');d.style.removeProperty('--intro-p')},1000)}
-function tick(now){if(left)return;if(!loaded)set(Math.min(0.9,target+(0.9-target)*0.015));shown+=Math.max(0.006,(target-shown)*0.09);if(shown>target)shown=target;d.style.setProperty('--intro-p',shown.toFixed(3));var c=document.getElementById('intro-count');if(c)c.textContent=('00'+Math.round(shown*100)).slice(-3);if(loaded&&shown>=0.999&&now-t0>=MIN){setTimeout(exit,180);return}requestAnimationFrame(tick)}
+function paint(v){d.style.setProperty('--intro-p',v.toFixed(3));var c=document.getElementById('intro-count');if(c)c.textContent=('00'+Math.round(v*100)).slice(-3)}
+function exit(){if(left)return;left=true;paint(1);d.classList.add('intro-done');setTimeout(function(){d.classList.remove('intro','intro-done');d.style.removeProperty('--intro-p')},1000)}
+function tick(now){if(left)return;var dt=Math.min(250,now-last);last=now;if(!loaded)set(Math.min(0.9,target+(0.9-target)*dt/1600));shown+=(target-shown)*(1-Math.exp(-dt/140))+dt/2500;if(shown>target)shown=target;paint(shown);if(loaded&&shown>=0.999&&now-t0>=MIN){setTimeout(exit,180);return}requestAnimationFrame(tick)}
 requestAnimationFrame(tick);
 function finish(){loaded=true;set(1)}
 function hero(){var i=document.querySelector('img[fetchpriority="high"]');if(!i||i.complete)return Promise.resolve();return new Promise(function(r){i.addEventListener('load',r,{once:true});i.addEventListener('error',r,{once:true})})}
